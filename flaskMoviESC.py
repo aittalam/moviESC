@@ -2,7 +2,6 @@ from flask import Flask, jsonify, abort
 import redis
 import urllib
 import argparse
-import yaml
 
 devel = True # set to False when you bring this script into production
 app = Flask(__name__)

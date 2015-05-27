@@ -121,21 +121,23 @@ def getIMDBid(bytesize,movhash):
 
 if __name__ == '__main__':
 
-	if len(sys.argv)<2:
-		url = 'http://download.gcarena.net/movies/Gravity%20%282013%29/Gravity.mkv'
-	else: 
-		url = sys.argv[1]
+    if len(sys.argv)<2:
+        url = 'https://archive.org/download/TheInternetsOwnBoyTheStoryOfAaronSwartz/TheInternetsOwnBoy_TheStoryofAaronSwartz-HD.mp4'
+    else: 
+        url = sys.argv[1]
 	
-	
-	s,h = hashURL(url)
-	print 'Size: %s, Hash: %s' % (str(s), str(h))
 
-	if not s or not h:
-		print "Could not determine size or hash: exiting"
-		exit()
+    print "Hashing %s..." % url
+    s,h = hashURL(url)
+    print 'Size: %s, Hash: %s' % (str(s), str(h))
 
-	IMDBid = getIMDBid(s,h)
-	if not IMDBid:
-		print "Could not determine IMDB id"
-	else:
-		print 'http://www.imdb.com/title/tt' + IMDBid
+    if not s or not h:
+        print "Could not determine size or hash: exiting"
+        exit()
+
+    print "Identifying movie... "
+    IMDBid = getIMDBid(s,h)
+    if not IMDBid:
+        print "Could not determine IMDB id"
+    else:
+	    print 'http://www.imdb.com/title/tt' + IMDBid
