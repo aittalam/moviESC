@@ -47,8 +47,6 @@ class OpendirCrawler(CrawlSpider):
             # NOTE: using up.path works only with "pure" opendirs. Websites publishing their
             #       data in an opendir-like way using software like e.g. Directory Lister
             #       (http://www.directorylister.com/) might serve directories in a different way.
-            #       For instance, http://srv2.hissmedia.com/?dir=Breaking%20Bad points to a dir
-            #       but the path will be recognized as a query string instead.
             #       In cases like this, up.path will appear empty, thus it will be possible
             #       for scrapy to crawl upper directories (it will still be good to get the
             #       whole website contents, btw...)
