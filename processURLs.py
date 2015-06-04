@@ -97,10 +97,14 @@ while movnum > 0:
         r.hsetnx("imdb:"+IMDBid,'plot',m['plot outline'])
 
     # poster URLs
-    if m.has_key('cover url'):
-	    r.sadd('posters:'+IMDBid,m['cover url'])
+    if m.has_key('full-size cover url'):
+	    r.sadd('posters:'+IMDBid,m['full-size cover url'])
     if m.has_key('altPosterURL'):
 	    r.sadd('posters:'+IMDBid,m['altPosterURL'])
+    if m.has_key('posterIMG'):
+        r.sadd('postersIMG:'+IMDBid,m['posterIMG'])
+    if m.has_key('altPosterIMG'):
+        r.sadd('postersIMG:'+IMDBid,m['altPosterIMG'])
 
     # movie genres
     if m.has_key('genres'):

@@ -2,6 +2,7 @@ import init
 import sys
 from trivialScraper import getAndExtract
 import imdb
+import urllib2
 
 conf,logger = init.configure()
 if conf is None:
@@ -35,13 +36,29 @@ def getMovieMeta(IMDBid):
     logger.debug('Getting movie metadata from IMDB')
     try:
         m = ia.get_movie(IMDBid)
+        if m.has_key('full-size cover url'):
+            # TODO: catch exceptions here (see below)
+            res = urllib2.urlopen(m['full-size cover url'])
+            m['posterIMG'] = res.read()
+            
         altPosterURL = getPosterURL(IMDBid)
         if altPosterURL:
             m['altPosterURL'] = altPosterURL
+            # TODO: catch exceptions here (see below)
+            res = urllib2.urlopen(altPosterURL)
+            m['altPosterIMG'] = res.read()
         return m
     except imdb.IMDbDataAccessError, e:
         logger.error('IMDB Data Access Error: %s' % e.errmsg)
         return
+#    except urllib2.HTTPError, e:
+#        logger.error('HTTPError = ' + str(e.code))
+#    except urllib2.URLError, e:
+#        logger.error('URLError = ' + str(e.reason))
+#    except httplib.HTTPException, e:
+#        logger.error('HTTPException')
+#    except:
+#        logger.error('Unknown exception while downloading poster')
 
 if __name__ == '__main__':
 
