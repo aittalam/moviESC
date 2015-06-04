@@ -6,22 +6,33 @@
 # in a "toIndex" set on redis. The crawl is limited to URLS within the specified domain and path
 #
 # Run as: scrapy runspider opendirCrawler.py -s LOG_ENABLED=0 -s DOWNLOAD_DELAY=1 -a start_url="http://my.opendir.url/"
-#                -a redis_host=<redis host> -a redis_port=<redis port> -a redis_db=<redis database>
+#  (optional)    -a redis_host=<redis host> -a redis_port=<redis port> -a redis_db=<redis database>
+#  (optional)    -a config_file=<configuration file> (see config.yaml)
 #
 # (if called without parameters, it will just connect to a default opendir for testing, using redis
 # on localhost, port 6379, db 0)
 
+import init
 import scrapy
 from scrapy.contrib.linkextractors import LinkExtractor
 from scrapy.contrib.spiders import CrawlSpider, Rule
 from urlparse import urlparse
 import redis
 import re
+import url
+
+# trivial way to check whether a URL points to a video file
+def isVideoURL(url):
+    ext = "(mkv|avi|mp4|m4v|ogv)"
+    regex = re.compile(".*?"+ext+"$",re.I)
+    return re.match(regex,url)
+
 
 class OpendirCrawler(CrawlSpider):
     name = 'OpendirCrawler'
 
-    # default parameters for redis connection, will be overwritten if they are specified on the cmdline
+    # default parameters for redis connection, will be overwritten if they are 
+    # specified on the cmdline or provided in the configuration
     redis_host = 'localhost'
     redis_port = '6379'
     redis_db = '0'
@@ -37,6 +48,31 @@ class OpendirCrawler(CrawlSpider):
 
     
     def __init__(self, *args, **kwargs): 
+
+        # load configuration params and start logger
+        cfgFileName = 'config.yaml'
+        if kwargs.has_key('config_file'):
+            cfgFileName = kwargs.get('config_file')
+
+        conf,self.logger = init.configure(config=cfgFileName)
+        if conf is not None:
+            self.redis_host = conf['redis_host']
+            self.redis_port = conf['redis_port']
+            self.redis_db = conf['redis_db']
+        else:
+            # self.logger becomes the default logger
+            self.logger.error("Could not open config file, reverting to defaults")
+
+        # if different host/port/db are passed, override config file
+        if kwargs.has_key('redis_host'):
+            self.redis_host = kwargs.get('redis_host')
+
+        if kwargs.has_key('redis_port'):
+            self.redis_port = kwargs.get('redis_port')
+
+        if kwargs.has_key('redis_db'):
+            self.redis_db = kwargs.get('redis_db')
+
         # if a start url has been provided, set the current crawler to use it
         # (also, use its domain as allowed domain, and its path as allowed path
         # for the LinkExtractor so you never go above the provided directory)
@@ -54,22 +90,13 @@ class OpendirCrawler(CrawlSpider):
                 Rule(LinkExtractor(allow=(up.path), deny_extensions=()), process_links='filter_links', follow=True),
             )
         else:
-            print "[i] No start urls provided, using default one(s) (%s)" %self.start_urls
+            self.logger.info("No start urls provided, using default one(s) (%s)" %self.start_urls)
 
-        if kwargs.has_key('redis_host'):
-            self.redis_host = kwargs.get('redis_host')
-
-        if kwargs.has_key('redis_port'):
-            self.redis_port = kwargs.get('redis_port')
-
-        if kwargs.has_key('redis_db'):
-            self.redis_db = kwargs.get('redis_db')
-
+        self.logger.info("Storing URLs in Redis (%s:%s, db %s)" %(self.redis_host,self.redis_port,self.redis_db))
         self.r = redis.StrictRedis(host=self.redis_host,port=self.redis_port, db=self.redis_db)
         self.r.sadd('opendirs',self.start_urls[0])
-
+        
         super(OpendirCrawler, self).__init__(*args, **kwargs) 
-
 
     # As we do not actually download anything, we use filter_links only to choose which links
     # we want to follow (directories, trivially defined as links ending in "/") and which ones
@@ -77,8 +104,6 @@ class OpendirCrawler(CrawlSpider):
     # is thrown away
     def filter_links(self, links):
         filteredLinks = []
-        ext = "(mkv|avi|mp4|m4v|ogv)"
-        regex = re.compile(".*?"+ext+"$",re.I)
 
         for link in links:
 			# if link is a directory, then follow it
@@ -89,8 +114,17 @@ class OpendirCrawler(CrawlSpider):
 
             # if not, verify whether it is a video file: if it is then save it, otherwise skip
             else:
-                res = re.match(regex,link.url)
-                if res:
-                    print "[i] sadd toIndex " + link.url
-                    self.r.sadd('toIndex', link.url)
+                if isVideoURL(link.url):
+                    # normalize the URL
+                    # normLinkURL = link.url
+                    normLinkURL = url.parse(link.url).canonical().escape().punycode().utf8()
+
+                    # save the url... but only if it has not been indexed yet
+                    # check if the URL exists in redis
+                    if not self.r.exists(normLinkURL):
+                        # if not, add it to the toIndex queue
+                        # (NOTE: it might be already present in toIndex, but we don't mind as it is a set)
+                        self.logger.info("sadd toIndex " + normLinkURL)
+                        self.r.sadd('toIndex', normLinkURL)
         return filteredLinks
+        

@@ -1,7 +1,24 @@
+import init
 import redis
 
+# default parameters for redis connection, will be overridden by the config file
+redis_host = 'localhost'
+redis_port = '6379'
+redis_db = '0'
+
+# load configuration params and start logger
+# (just use default config.yaml filename for now, might extend to a parameter later)
+conf,logger = init.configure(loggerName='movies')
+if conf is not None:
+    redis_host = conf['redis_host']
+    redis_port = conf['redis_port']
+    redis_db = conf['redis_db']
+else:
+    logger.error("Could not open config file, reverting to defaults")
+
 # connect to redis
-r = redis.StrictRedis(host='localhost',port='6379', db=0)
+logger.info("Reading data from Redis (%s:%s, db %s)" %(redis_host,redis_port,redis_db))
+r = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
 
 movies = r.keys("posters:*")
 

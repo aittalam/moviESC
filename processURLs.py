@@ -1,92 +1,112 @@
+import init
 import redis
-import identifyMovie
-from imdb import IMDb
+import identifyMovie as im
+import movieMeta as mm
 
-# move this setting to a configuration / command line parameter
-interactive = False
+# default, hardcoded values for some settings (you can override them in the config file)
+
+# if movie identification is interactive, then whenever a movie cannot be identified 
+# the IMDB id is asked to the user on the command line
+interactive = False         
+key_toIndex = 'toIndex'     # the queue (actually a set now) where the movies that still need to be indexed are stored
+key_failed = 'failed'       # the set where the unreadable (no size/hash) movies are saved 
+key_noIMDB = 'noIMDB'       # the set containing the movies for which no IMDB was found
+
+# default parameters for redis connection
+redis_host = 'localhost'
+redis_port = '6379'
+redis_db = '0'
+
+# load configuration params and start logger
+# (just use default config.yaml filename for now, might extend to a parameter later)
+conf,logger = init.configure()
+if conf is not None:
+    interactive = conf['interactive_ident']
+    key_toIndex = conf['key_toIndex']
+    key_failed = conf['key_failed']
+    key_noIMDB = conf['key_noIMDB']
+    redis_host = conf['redis_host']
+    redis_port = conf['redis_port']
+    redis_db = conf['redis_db']
+else:
+    logger.error("Could not open config file, reverting to defaults")
+
 
 # connect to redis
-r = redis.StrictRedis(host='localhost',port='6379', db=0)
-ia = IMDb()
-
-key_toIndex = 'toIndex'
-key_failed = 'failed'
-key_noIMDB = 'noIMDB'
+logger.info("Storing URLs in Redis (%s:%s, db %s)" %(redis_host,redis_port,redis_db))
+r = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
 
 movnum = r.scard(key_toIndex)
 
 # while you have stuff to index
 while movnum > 0:
-	movURL = r.spop(key_toIndex)
+    movURL = r.spop(key_toIndex)
 
-	if not movURL:
-		print "Done."
-		break
-		
-	# calculate hash
-	print "Hashing URL " + movURL + "... ",
-	s,h = identifyMovie.hashURL(movURL)
-	print "ok"
+    # some other thread might have popped the last url from the queue
+    if not movURL:
+        break
 
-	# if an error occurred in hashing, skip URL and save it in failed
-	if not s:
-		r.sadd(key_failed, movURL)
-		continue
+    logger.info("Identifying URL " + movURL)
 
-	# save data related to URL
-	r.hset(movURL,'size',s)
-	r.hset(movURL,'hash',h)
+    # calculate hash
+    logger.debug("Hashing URL " + movURL)
+    s,h = im.hashURL(movURL)
 
-	# get IMDB id from opensubtitles
-	print "Getting IMDB id for movie... ",
-	IMDBid = identifyMovie.getIMDBid(s,h)
-	print "ok"
+    # if an error occurred in hashing, skip URL and save it in failed
+    if not s:
+        r.sadd(key_failed, movURL)
+        continue
 
-	# if the URL was not avaiable (or cannot be retrieved), skip it and save it in failed
-        if not IMDBid and interactive:
-                IMDBid = raw_input("IMDBid not found, please enter it manually: ")
+    # save data related to URL
+    r.hset(movURL,'size',s)
+    r.hset(movURL,'hash',h)
 
-	if not IMDBid:
-		r.sadd(key_noIMDB, movURL)
-		continue
+    # get IMDB id from opensubtitles
+    logger.debug("Getting IMDBid for movie (%s,%s)" %(str(s),str(h)))
+    IMDBid = im.getIMDBid(s,h)
 
-	# if you got the IMDB id, save it together with the URL
-	print "Saving in Redis... ",
-	r.sadd("urls:"+IMDBid, movURL)
-	print "ok"
+    # if the URL was not available (or cannot be retrieved), skip it and save it in failed
+    if not IMDBid and interactive:
+        IMDBid = raw_input("IMDBid not found, please enter it manually: ")
 
-	# add metadata
-	print "Getting movie metadata... ",
-	try:
-		m = ia.get_movie(IMDBid)
-	except IMDbDataAccessError, e:
-		print '[x] IMDB Data Access Error: %s' % e.errmsg
-		r.sadd(key_noIMDB, movURL)
-		continue
+    if not IMDBid:
+        r.sadd(key_noIMDB, movURL)
+        continue
 
-	# string metadata (title, year, summary)
-	# should we suppose we have at least the title?
-	if m.has_key('title'):
-		r.hsetnx("imdb:"+IMDBid,'title',m['title'])
-	if m.has_key('year'):
-		r.hsetnx("imdb:"+IMDBid,'year',m['year'])
-	if m.has_key('rating'):
-		r.hsetnx("imdb:"+IMDBid,'rating',m['rating'])
-	if m.has_key('plot outline'):
-		r.hsetnx("imdb:"+IMDBid,'plot',m['plot outline'])
+    # if you got the IMDB id, save it together with the URL
+    logger.info("IMDBid found! Saving URL for IMDBid %s" %str(IMDBid))
+    r.sadd("urls:"+IMDBid, movURL)
 
-	# poster URLs
-	if m.has_key('cover url'):
-		r.sadd('posters:'+IMDBid,m['cover url'])
+    # add metadata
+    logger.debug("Getting movie metadata for IMDBid %s" %str(IMDBid))
+    m = mm.getMovieMeta(IMDBid)
+    if not m:
+        r.sadd(key_noIMDB,movURL)
+        continue
 
-	altPosterURL = identifyMovie.getPosterURL(IMDBid)
-	if altPosterURL:
-		r.sadd('posters:'+IMDBid,altPosterURL)
+    logger.info("Metadata found for IMDBid %s" %str(IMDBid))
+    # string metadata (title, year, summary)
+    # should we suppose we have at least the title?
+    if m.has_key('title'):
+        r.hsetnx("imdb:"+IMDBid,'title',m['title'])
+    if m.has_key('year'):
+        r.hsetnx("imdb:"+IMDBid,'year',m['year'])
+    if m.has_key('rating'):
+        r.hsetnx("imdb:"+IMDBid,'rating',m['rating'])
+    if m.has_key('plot outline'):
+        r.hsetnx("imdb:"+IMDBid,'plot',m['plot outline'])
 
-	# movie genres
-	if m.has_key('genres'):
-		for genre in m['genres']:
-			r.sadd('genre:'+genre,IMDBid)
+    # poster URLs
+    if m.has_key('cover url'):
+	    r.sadd('posters:'+IMDBid,m['cover url'])
+    if m.has_key('altPosterURL'):
+	    r.sadd('posters:'+IMDBid,m['altPosterURL'])
 
-	print "ok"
-	movnum = r.scard(key_toIndex)
+    # movie genres
+    if m.has_key('genres'):
+	    for genre in m['genres']:
+		    r.sadd('genre:'+genre,IMDBid)
+
+    movnum = r.scard(key_toIndex)
+
+logger.info("Movie queue empty: stopping.")

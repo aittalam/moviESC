@@ -1,10 +1,26 @@
+import init
 from flask import Flask, jsonify, abort
 import redis
 import urllib
-import argparse
 
 devel = True # set to False when you bring this script into production
 app = Flask(__name__)
+
+
+# default parameters for redis connection, will be overridden by the config file
+redis_host = 'localhost'
+redis_port = '6379'
+redis_db = '0'
+
+# load configuration params and start logger
+# (just use default config.yaml filename for now, might extend to a parameter later)
+conf,logger = init.configure(loggerName='movies')
+if conf is not None:
+    redis_host = conf['redis_host']
+    redis_port = conf['redis_port']
+    redis_db = conf['redis_db']
+else:
+    logger.error("Could not open config file, reverting to defaults")
 
 
 # just a placeholder - modify before releasing
@@ -109,16 +125,16 @@ def get_everything():
         # return the full data back
         return jsonify( { 'count': len(IMDBids), 'movies': everything})
 
+
 if __name__ == "__main__":
 
-	# connect to redis
-	r = redis.StrictRedis(host='localhost',port='6379', db=0)
+    # connect to redis
+    r = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
 
-	if devel :
-		app.debug = True
-		#app.run()
-		app.run(host='0.0.0.0')
-	else :   
-		# change with the following when in production mode
-		app.debug = False
-		app.run(host='0.0.0.0')
+    if devel :
+        app.debug = True
+        app.run(host='0.0.0.0')
+    else :   
+        # change with the following when in production mode
+        app.debug = False
+        app.run(host='0.0.0.0')
