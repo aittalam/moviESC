@@ -37,7 +37,7 @@ make
 - Install dependencies 
 
 ```
-pip install redis Scrapy Flask IMDbPY
+pip install redis Scrapy Flask IMDbPY PyYAML
 ```
 
 On Debian/Raspbian systems, you might first need to satisfy some dependencies:
