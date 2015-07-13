@@ -31,7 +31,7 @@ def isVideoURL(url):
 class OpendirCrawler(CrawlSpider):
     name = 'OpendirCrawler'
 
-    # default parameters for redis connection, will be overwritten if they are 
+    # default parameters for redis connection, will be overwritten if they are
     # specified on the cmdline or provided in the configuration
     redis_host = 'localhost'
     redis_port = '6379'
@@ -46,19 +46,19 @@ class OpendirCrawler(CrawlSpider):
         Rule(LinkExtractor(allow=('/zelif/zeivom/'), deny_extensions=()), process_links='filter_links', follow=True),
     )
 
-    
-    def __init__(self, *args, **kwargs): 
+
+    def __init__(self, *args, **kwargs):
 
         # load configuration params and start logger
         cfgFileName = 'config.yaml'
         if kwargs.has_key('config_file'):
             cfgFileName = kwargs.get('config_file')
 
-        conf,self.logger = init.configure(config=cfgFileName)
-        if conf is not None:
-            self.redis_host = conf['redis_host']
-            self.redis_port = conf['redis_port']
-            self.redis_db = conf['redis_db']
+        self.conf,self.logger = init.configure(config=cfgFileName)
+        if self.conf is not None:
+            self.redis_host = self.conf['redis_host']
+            self.redis_port = self.conf['redis_port']
+            self.redis_db = self.conf['redis_db']
         else:
             # self.logger becomes the default logger
             self.logger.error("Could not open config file, reverting to defaults")
@@ -94,9 +94,9 @@ class OpendirCrawler(CrawlSpider):
 
         self.logger.info("Storing URLs in Redis (%s:%s, db %s)" %(self.redis_host,self.redis_port,self.redis_db))
         self.r = redis.StrictRedis(host=self.redis_host,port=self.redis_port, db=self.redis_db)
-        self.r.sadd('opendirs',self.start_urls[0])
-        
-        super(OpendirCrawler, self).__init__(*args, **kwargs) 
+        self.r.sadd(self.conf['key_opendirs'],self.start_urls[0])
+
+        super(OpendirCrawler, self).__init__(*args, **kwargs)
 
     # As we do not actually download anything, we use filter_links only to choose which links
     # we want to follow (directories, trivially defined as links ending in "/") and which ones
@@ -107,7 +107,7 @@ class OpendirCrawler(CrawlSpider):
 
         for link in links:
 			# if link is a directory, then follow it
-            # TODO: "?dir=" is provided to properly recognize as dirs the ones which 
+            # TODO: "?dir=" is provided to properly recognize as dirs the ones which
             #       are specified as queries (it is an in-place fix and should be removed)
             if link.url.endswith("/") or link.url.find("?dir=")>=0:
                 filteredLinks.append(link)
@@ -124,7 +124,6 @@ class OpendirCrawler(CrawlSpider):
                     if not self.r.exists(normLinkURL):
                         # if not, add it to the toIndex queue
                         # (NOTE: it might be already present in toIndex, but we don't mind as it is a set)
-                        self.logger.info("sadd toIndex " + normLinkURL)
-                        self.r.sadd('toIndex', normLinkURL)
+                        self.logger.info("sadd %s %s " % (self.conf['key_toIndex'],normLinkURL))
+                        self.r.sadd(self.conf['key_toIndex'], normLinkURL)
         return filteredLinks
-        

@@ -5,13 +5,14 @@ redis_host: !!str "localhost"
 redis_port: !!str "6379"
 redis_db: !!str "0"
 
-# key names / formats     
-key_toIndex: !!str 'toIndex'  # the queue (actually a set now) where the movies that still need to be indexed are stored
-key_failed: !!str 'failed'    # the set where the unreadable (no size/hash) movies are saved 
+# key names / formats
+key_opendirs: !!str 'opendirs'    # the set containing all the opendirs that have been crawled
+key_toIndex: !!str 'toIndex'  # the set where the movies that still need to be indexed are stored
+key_failed: !!str 'failed'    # the set where the unreadable (no size/hash) movies are saved
 key_noIMDB: !!str 'noIMDB'    # the set containing the movies for which no IMDB was found
 
 # interactive identification allows user to manually specify
-# an IMDB id when a movie cannot be identified automatically 
+# an IMDB id when a movie cannot be identified automatically
 interactive_ident: !!bool 'False'
 
 # logger
@@ -53,7 +54,7 @@ logging:
       stream: ext://sys.stdout
       formatter: simpleFormatter
       level: !!python/name:logging.NOTSET
-    
+
     stderr:
       class: logging.StreamHandler
       stream: ext://sys.stderr
@@ -66,4 +67,3 @@ logging:
       #format: '%(name)s %(asctime)s %(levelname)s %(message)s'
       format: '[%(levelname)s] %(message)s'
       datefmt: '%Y%m%d%H%M%S'
-
