@@ -99,9 +99,9 @@ def getCachedMetadata(r, IMDBid):
 
         # getMovieMeta should provide everything we need (IMDB meta + something more)
         # we want to save the following keys in the imdb:IMDBid hash
-        imdbKeys = ('title', 'q', 'slug', 'year', 'rating', \
-                    'runtime_simple', 'plot outline', 'cover url', \
-                    'full-size cover url', 'altPosterURL')
+        imdbKeys = ('title', 'long imdb title', 'slug', 'year', 'rating', \
+            'runtime_simple', 'plot outline', 'cover url', 'full-size cover url', \
+            'altPosterURL')
 
         for key in imdbKeys:
             if m.has_key(key):
@@ -110,8 +110,8 @@ def getCachedMetadata(r, IMDBid):
                 logger.warning('Movie with IMDB %s does not have key %s!' %(str(IMDBid),key))
 
         # movie genres
-	    for genre in m.get('genres',[]):
-		    r.sadd(key_genres.replace("#genre#",genre), IMDBid)
+        for genre in m.get('genres',[]):
+            r.sadd(key_genres.replace("#genre#",genre), IMDBid)
 
         # poster URLs
         # TODO: fix key names here
@@ -120,9 +120,9 @@ def getCachedMetadata(r, IMDBid):
         # poster URLs together with imdb:* keys, keeping their original semantics
         # related to size/quality
         if m.has_key('full-size cover url'):
-    	    r.sadd('posters:'+IMDBid,m['full-size cover url'])
+            r.sadd('posters:'+IMDBid,m['full-size cover url'])
         if m.has_key('altPosterURL'):
-    	    r.sadd('posters:'+IMDBid,m['altPosterURL'])
+            r.sadd('posters:'+IMDBid,m['altPosterURL'])
 
     return m
 
