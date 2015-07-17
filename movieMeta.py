@@ -2,7 +2,10 @@ import init
 import sys
 from trivialScraper import getAndExtract
 import imdb
-import urllib2
+import urllib
+import re
+import md5
+import os, os.path
 
 conf,logger = init.configure()
 if conf is None:
@@ -32,21 +35,47 @@ def getPosterURL(IMDBid):
 
 # getMovieMeta gets movie metadata from IMDB given the ID
 # might be extended to something smarter
-def getMovieMeta(IMDBid):
+def getMovieMeta(IMDBid, downloadPosters = False):
     logger.debug('Getting movie metadata from IMDB')
     try:
         m = ia.get_movie(IMDBid)
-        if m.has_key('full-size cover url'):
-            # TODO: catch exceptions here (see below)
-            res = urllib2.urlopen(m['full-size cover url'])
-            m['posterIMG'] = res.read()
-            
+
+        # -------------------------------------------------------
+        # clean runtime (as it is a list, just get first element)
+        # if key does not exist, just provide 0 as runtime
+        m['runtime_simple'] = m.get('runtime',[u'0'])[0]
+
+        # -------------------------------------------------------
+        # generate slug:
+        # (1) lowercase long imdb title
+        slug = m.get('long imdb title','').lower()
+        # remove anything which is not alphanumeric or a space
+        slug = re.sub('[^a-zA-Z0-9 ]','',slug)
+        # convert spaces into dashes
+        m['slug'] = re.sub(' ','-',slug)
+
+        # -------------------------------------------------------
+        # add alternative poster URL if it exists
         altPosterURL = getPosterURL(IMDBid)
         if altPosterURL:
             m['altPosterURL'] = altPosterURL
-            # TODO: catch exceptions here (see below)
-            res = urllib2.urlopen(altPosterURL)
-            m['altPosterIMG'] = res.read()
+
+        # -------------------------------------------------------
+        # download posters
+        if downloadPosters:
+            logger.debug('Storing posters in %s' % conf['path_posters'])
+            for posterKey in ('full-size cover url','altPosterURL'):
+                if m.has_key(posterKey):
+                    # build filename as a hash of the URL
+                    fname = os.path.join(conf['path_posters'],md5.new(m[posterKey]).hexdigest())
+                    # check if file exists...
+                    if os.path.isfile(fname):
+                        logger.debug('Poster at %s has already been downloaded: skipping' % m[posterKey])
+                    else:
+                        logger.debug('Downloading poster file at url %s' % m[posterKey])
+                        # if not, download and save poster
+                        # TODO: catch urllib exceptions here (see below some for urllib2)
+                        urllib.urlretrieve(m[posterKey],fname)
         return m
     except imdb.IMDbDataAccessError, e:
         logger.error('IMDB Data Access Error: %s' % e.errmsg)
@@ -64,33 +93,24 @@ if __name__ == '__main__':
 
     if len(sys.argv)<2:
         IMDBid = "3268458"
-    else: 
+    else:
         IMDBid = sys.argv[1]
-	
+
     print "[i] Getting metadata for IMDB id %s..." % IMDBid
     m = getMovieMeta(IMDBid)
 
     if m:
-        if m.has_key('title'):
-            print "    Title: %s" %m['title']
-    if m.has_key('year'):
-            print "    Year: %s" %m['year']
-    if m.has_key('rating'):
-            print "    Rating: %s" %m['rating']
-    if m.has_key('plot outline'):
-            print "    Plot Outline: %s" %m['plot outline']
+        # choose which keys we want printed (e.g. ignoring binaries)
+        imdbKeys = ('title', 'long imdb title', 'slug', 'year', 'rating', \
+            'runtime_simple', 'plot outline', 'cover url', 'full-size cover url', \
+            'altPosterURL')
+        for key in imdbKeys:
+            print "  %s: %s" % (key, m.get(key,""))
 
-    # poster URLs
-    if m.has_key('full-size cover url'):
-            print "    Cover URL: %s " %m['full-size cover url']
-    if m.has_key('altPosterURL'):
-            print "    Alt Poster URL: %s " %m['altPosterURL']
-
-    # movie genres
-    if m.has_key('genres'):
-        print "    Genres:",
-        for genre in m['genres']:
-            print " %s" %genre,
+        # movie genres
+        print "  Genres:",
+        for genre in m.get('genres',[]):
+            print "%s" %genre,
 
     else:
         print "[x] No metadata found"

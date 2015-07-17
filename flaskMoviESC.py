@@ -3,6 +3,8 @@ from flask import Flask, jsonify, abort, send_file
 import redis
 import urllib
 import StringIO
+import os
+import md5
 
 showMoviesTemplate = './html/movies.html'
 
@@ -28,106 +30,119 @@ else:
 # just a placeholder - modify before releasing
 @app.route("/")
 def showMovies():
-        f = open(showMoviesTemplate, 'r')
-        html = f.read()
-        f.close()
+    f = open(showMoviesTemplate, 'r')
+    html = f.read()
+    f.close()
 
-        movList = ''
-        # get only the movies which have at least a poster image? 
-        mov  = r.keys('postersIMG:*')
-        for m in mov :
-            IMDBid = m.replace("postersIMG:","")
-            movieURL = r.smembers("urls:"+IMDBid).pop()
-            movieTitle = r.hget("imdb:"+IMDBid,"title")
-            if not movieTitle:
-                movieTitle=""
+    movList = ''
+    # get only the movies which have at least a poster image?
+    key_uris = conf['key_uris']
+    mov  = r.keys(key_uris.replace('#imdbid#','*'))
+    for m in mov :
+        IMDBid = m.replace(key_uris.replace('#imdbid#',''),'')
+        movieURL = r.smembers(key_uris.replace('#imdbid#',IMDBid)).pop()
+        movieTitle = r.hget(conf['key_imdb'].replace('#imdbid#',IMDBid),'long imdb title')
+        if not movieTitle:
+            movieTitle=""
 
-            movList = movList + '<li><a href="%s"><img src="/api/v1.0/poster/%s" alt="%s"></a></li>\n' %(movieURL, IMDBid, movieTitle)
+        movList = movList + '<li><a href="%s"><img src="/api/v1.0/poster/%s" alt="%s"></a></li>\n' %(movieURL, IMDBid, movieTitle)
 
-        return html.replace('###MOVIELIST###',movList)
+    return html.replace('###MOVIELIST###',movList)
 
 
 # get urls from IMDB ids
-@app.route('/api/v1.0/urls/<string:IMDBid>', methods = ['GET'])
-def get_urls(IMDBid):
+@app.route('/api/v1.0/uris/<string:IMDBid>', methods = ['GET'])
+def get_uris(IMDBid):
+    print conf['key_uris']
+    uris = list(r.smembers(conf['key_uris'].replace('#imdbid#',IMDBid)))
 
-	urls = list(r.smembers("urls:"+str(IMDBid)))
+    # return the full data back
+    return jsonify( { 'uris': uris } )
 
-    	# return the full data back
-    	return jsonify( { 'urls': urls } )
 
 # get (a list of) poster urls from IMDB ids
 @app.route('/api/v1.0/posters/<string:IMDBid>', methods = ['GET'])
 def get_posters(IMDBid):
+    posters = list(r.smembers("posters:"+str(IMDBid)))
 
-	posters = list(r.smembers("posters:"+str(IMDBid)))
-
-    	# return the full data back
-    	return jsonify( { 'posters': posters } )
+    # return the full data back
+    return jsonify( { 'posters': posters } )
 
 
 # get (a single, randomly chosen) poster image for a given IMDBid
 @app.route('/api/v1.0/poster/<string:IMDBid>', methods = ['GET'])
 def get_poster(IMDBid):
-    binary_image = r.srandmember('postersIMG:'+IMDBid)
-    return send_file(StringIO.StringIO(binary_image), mimetype='image/jpg')
+    # TODO: remove this (low effort, but not very useful), and prefer something like poster-large, poster-medium, etc.
+    #       within the imdb:* keys. Until then, the "posters" key might remain unofficial
+    posterURL = r.srandmember('posters:'+IMDBid)
+    fname = os.path.join(conf['path_posters'],md5.new(posterURL).hexdigest())
+    # TODO: check for filename existence first - if not, choose default "poster missing" pic
+    f = open(fname,'rb')
+    image = send_file(StringIO.StringIO(f.read()), mimetype='image/jpg')
+    f.close()
+    return image
+
+
+# get genres list
+@app.route('/api/v1.0/genres/', methods = ['GET'])
+def get_genres():
+    genreList = r.keys(conf['key_genres'].replace('#genre#','*'))
+
+    # return the full data back
+    return jsonify( { 'genres': genreList} )
 
 
 # get IMDBs from genres
 @app.route('/api/v1.0/genre/<string:genres>', methods = ['GET'])
 def get_IMDBids(genres):
-        genreList = str.split(urllib.unquote_plus(genres).encode())
+    genreList = str.split(urllib.unquote_plus(genres).encode())
 
-        IMDBids = list(r.sinter(map(lambda x:'genre:'+str(x),set(genreList))))
+    IMDBids = list(r.sinter(map(lambda x:conf['key_genres'].replace('#genre#',str(x)),set(genreList))))
 
-    	# return the full data back
-    	return jsonify( { 'IMDBids': IMDBids} )
+    # return the full data back
+    return jsonify( { 'IMDBids': IMDBids} )
+
 
 # get details from IMDB id
 @app.route('/api/v1.0/details/<string:IMDBid>', methods = ['GET'])
 def get_details(IMDBid):
+    details = r.hgetall(conf['key_imdb'].replace('#imdbid#',IMDBid))
 
-        details = r.hgetall("imdb:"+str(IMDBid))
-
-    	# return the full data back
-    	return jsonify( { 'details': details} )
+    # return the full data back
+    return jsonify( { 'details': details} )
 
 
 # get all data about an IMDB id
 @app.route('/api/v1.0/data/<string:IMDBid>', methods = ['GET'])
 def get_all_details(IMDBid):
+    details = r.hgetall(conf['key_imdb'].replace('#imdbid#',IMDBid))
+    urls = list(r.smembers(conf['key_uris'].replace('#imdbid#',IMDBid)))
+    posters = list(r.smembers("posters:"+str(IMDBid)))
 
-        details = r.hgetall("imdb:"+str(IMDBid))
-	urls = list(r.smembers("urls:"+str(IMDBid)))
-	posters = list(r.smembers("posters:"+str(IMDBid)))
+    # return the full data back
+    return jsonify( { 'details': details, 'urls': urls, 'posters': posters} )
 
-    	# return the full data back
-    	return jsonify( { 'details': details, 'urls': urls, 'posters': posters} )
 
 # get all data about an IMDB id in HTML
 @app.route('/api/v1.0/html/<string:IMDBid>', methods = ['GET'])
 def get_html_details(IMDBid):
-
-    details = r.hgetall("imdb:"+str(IMDBid))
-    urls = list(r.smembers("urls:"+str(IMDBid)))
+    details = r.hgetall(conf['key_imdb'].replace('#imdbid#',IMDBid))
+    urls = list(r.smembers(conf['key_uris'].replace('#imdbid#',IMDBid)))
     posters = list(r.smembers("posters:"+str(IMDBid)))
 
     if details:
-        html = '<html><head><title>'+details['title']+'</title></head><body>'
-        html += '<a href="http://www.imdb.com/title/tt'+IMDBid+'">back</a><br/>'
-        html += '<h1>'+details['title']
-        if details.has_key('year'):
-            html += ' ('+details['year']+')'
-        html += '</h1>'
+        html = '<html><head><title>%s</title></head><body>' % details['long imdb title']
+        html += '<a href="http://www.imdb.com/title/tt%s">back</a><br/>' % IMDBid
+        html += '<h1>%s</h1>' % details['long imdb title']
         if details.has_key('rating'):
-            html += 'Rating: ' + details['rating'] + '/10<br/><br/>'
-        html += '<img src="/api/v1.0/poster/'+IMDBid+'"><br/>'
+            html += 'Rating: %s/10<br/><br/>' % details['rating']
+        html += '<img src="/api/v1.0/poster/%s"><br/>' % IMDBid
         if details.has_key('plot'):
-            html += '<i>'+details['plot']+'</i><br/>'
+            html += '<i>%s</i><br/>' % details['plot']
         html += '<br/>Download links:<br/><ul>'
         for url in urls:
-            html += '<li><a href="'+url+'">'+url+'</a></li>'
-        html += '</ul>'	
+            html += '<li><a href="%s">%s</a></li>' %(url,url)
+        html += '</ul>'
         html += '</body></html>'
     else:
         html = '<html><head><title>No links found</title></head><body>'
@@ -141,15 +156,15 @@ def get_html_details(IMDBid):
 @app.route('/api/v1.0/all', methods = ['GET'])
 def get_everything():
 
-	everything=[]
-	IMDBids = r.keys("imdb:*")
-	for IMDBid in IMDBids:
-		IMDBid = IMDBid.replace("imdb:","")
-		details = r.hgetall("imdb:"+str(IMDBid))
-        	urls = list(r.smembers("urls:"+str(IMDBid)))
-        	posters = list(r.smembers("posters:"+str(IMDBid)))
-		everything.append({ 'IMDBid': IMDBid, 'details': details, 'urls': urls, 'posters': posters})
-	
+    everything=[]
+    IMDBids = r.keys(conf['key_imdb'].replace('#imdbid#','*'))
+    for IMDBid in IMDBids:
+        IMDBid = IMDBid.replace(conf['key_imdb'].replace('#imdbid#',''),"")
+        details = r.hgetall(conf['key_imdb'].replace('#imdbid#',IMDBid))
+        urls = list(r.smembers(conf['key_uris'].replace('#imdbid#',IMDBid)))
+        posters = list(r.smembers("posters:"+str(IMDBid)))
+        everything.append({ 'IMDBid': IMDBid, 'details': details, 'urls': urls, 'posters': posters})
+
         # return the full data back
         return jsonify( { 'count': len(IMDBids), 'movies': everything})
 
@@ -162,7 +177,7 @@ if __name__ == "__main__":
     if devel :
         app.debug = True
         app.run(host='0.0.0.0')
-    else :   
+    else :
         # change with the following when in production mode
         app.debug = False
         app.run(host='0.0.0.0')
