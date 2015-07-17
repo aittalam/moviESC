@@ -10,6 +10,13 @@ key_opendirs: !!str 'opendirs'    # the set containing all the opendirs that hav
 key_toIndex: !!str 'toIndex'  # the set where the movies that still need to be indexed are stored
 key_failed: !!str 'failed'    # the set where the unreadable (no size/hash) movies are saved
 key_noIMDB: !!str 'noIMDB'    # the set containing the movies for which no IMDB was found
+key_imdb: !!str 'imdb:#imdbid#'  # the hash containing all the IMDB metadata we are interested in
+key_uris: !!str 'uris:#imdbid#'  # the hash containing all the URIs matching a gived IMDBid
+key_hashIMDB: !!str 'h2i:#size#:#hash#'    # cached mappings between bytesize/movhash and IMDB ids
+key_genres: !!str 'genre:#genre#'  # the set containing all the IMDBids of movies of a given genre
+
+# folders
+path_posters: !!str './posters'
 
 # interactive identification allows user to manually specify
 # an IMDB id when a movie cannot be identified automatically
