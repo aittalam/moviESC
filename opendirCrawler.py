@@ -14,8 +14,8 @@
 
 import init
 import scrapy
-from scrapy.contrib.linkextractors import LinkExtractor
-from scrapy.contrib.spiders import CrawlSpider, Rule
+from scrapy.linkextractors import LinkExtractor
+from scrapy.spiders import CrawlSpider, Rule
 from urlparse import urlparse
 import redis
 import re
@@ -49,19 +49,21 @@ class OpendirCrawler(CrawlSpider):
 
     def __init__(self, *args, **kwargs):
 
+
         # load configuration params and start logger
         cfgFileName = 'config.yaml'
         if kwargs.has_key('config_file'):
             cfgFileName = kwargs.get('config_file')
 
-        self.conf,self.logger = init.configure(config=cfgFileName)
-        if self.conf is not None:
-            self.redis_host = self.conf['redis_host']
-            self.redis_port = self.conf['redis_port']
-            self.redis_db = self.conf['redis_db']
+        self._conf,self._logger = init.configure(config=cfgFileName)
+
+        if self._conf is not None:
+            self.redis_host = self._conf['redis_host']
+            self.redis_port = self._conf['redis_port']
+            self.redis_db = self._conf['redis_db']
         else:
             # self.logger becomes the default logger
-            self.logger.error("Could not open config file, reverting to defaults")
+            self._logger.error("Could not open config file, reverting to defaults")
 
         # if different host/port/db are passed, override config file
         if kwargs.has_key('redis_host'):
@@ -90,11 +92,11 @@ class OpendirCrawler(CrawlSpider):
                 Rule(LinkExtractor(allow=(up.path), deny_extensions=()), process_links='filter_links', follow=True),
             )
         else:
-            self.logger.info("No start urls provided, using default one(s) (%s)" %self.start_urls)
+            self._logger.info("No start urls provided, using default one(s) (%s)" %self.start_urls)
 
-        self.logger.info("Storing URLs in Redis (%s:%s, db %s)" %(self.redis_host,self.redis_port,self.redis_db))
+        self._logger.info("Storing URLs in Redis (%s:%s, db %s)" %(self.redis_host,self.redis_port,self.redis_db))
         self.r = redis.StrictRedis(host=self.redis_host,port=self.redis_port, db=self.redis_db)
-        self.r.sadd(self.conf['key_opendirs'],self.start_urls[0])
+        self.r.sadd(self._conf['key_opendirs'],self.start_urls[0])
 
         super(OpendirCrawler, self).__init__(*args, **kwargs)
 
@@ -124,6 +126,6 @@ class OpendirCrawler(CrawlSpider):
                     if not self.r.exists(normLinkURL):
                         # if not, add it to the toIndex queue
                         # (NOTE: it might be already present in toIndex, but we don't mind as it is a set)
-                        self.logger.info("sadd %s %s " % (self.conf['key_toIndex'],normLinkURL))
-                        self.r.sadd(self.conf['key_toIndex'], normLinkURL)
+                        self._logger.info("sadd %s %s " % (self._conf['key_toIndex'],normLinkURL))
+                        self.r.sadd(self._conf['key_toIndex'], normLinkURL)
         return filteredLinks
