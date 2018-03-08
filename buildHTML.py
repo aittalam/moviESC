@@ -27,7 +27,7 @@ print '<html><head><title>MovieZzZzZz!!!</title><link rel="stylesheet" type="tex
 for movie in movies:
 	IMDBid = movie.replace("posters:","")
 	posterURL = r.smembers(movie).pop()
-	movieURL = r.smembers("urls:"+IMDBid).pop()
+	movieURL = r.smembers("uris:"+IMDBid).pop()
 	movieTitle = r.hget("imdb:"+IMDBid,"title")
 	if not movieTitle:
 		movieTitle=""
