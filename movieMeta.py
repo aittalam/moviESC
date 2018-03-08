@@ -56,9 +56,9 @@ def getMovieMeta(IMDBid, downloadPosters = False):
 
         # -------------------------------------------------------
         # add alternative poster URL if it exists
-        altPosterURL = getPosterURL(IMDBid)
-        if altPosterURL:
-            m['altPosterURL'] = altPosterURL
+        #altPosterURL = getPosterURL(IMDBid)
+        #if altPosterURL:
+        #    m['altPosterURL'] = altPosterURL
 
         # -------------------------------------------------------
         # download posters
