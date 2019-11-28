@@ -4,7 +4,7 @@ import yaml
 def configure(config='config.yaml', loggerName='dev'):
     try:
         f = file(config, 'r')
-        conf = yaml.load(f)
+        conf = yaml.load(f, Loader=yaml.FullLoader)
         f.close()
     
         logging.config.dictConfig(conf['logging'])
