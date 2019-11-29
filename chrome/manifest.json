@@ -11,7 +11,7 @@
 
   "content_scripts": [
     {
-      "matches": ["http://www.imdb.com/*"],
+      "matches": ["http://www.imdb.com/*", "https://www.imdb.com/*"],
       "js": ["moviESC.js"]
     }
   ],

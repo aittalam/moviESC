@@ -1,5 +1,6 @@
 import init
-import urllib, urllib2
+import urllib.request as ur
+import urllib.error as ue
 import struct
 import sys
 import re
@@ -14,50 +15,51 @@ URL_OS = 'http://www.opensubtitles.org/en/search/sublanguageid-all/moviebytesize
 RE_IMDBID = 'imdb.com/title/tt(\d+)/'
 
 def hashURL(url):
+    print(url)
     try:
         longlongformat = 'q'  # long long 
         bytesize = struct.calcsize(longlongformat)
    
         # get file size
-        headers = urllib2.urlopen(url).info().getheaders("Content-Length")
-        if len(headers) == 0 : 
+        filesize = ur.urlopen(url).info().get("Content-Length", 0)
+        if filesize == 0 : 
             logger.error('No Content-Length header available')
             return None,None
-        filesize  = headers[0]
-        hash = long(filesize)
+        hash_ = int(filesize)
         
         # work on first 64KB of the file
-        r = urllib2.Request(url)
+        r = ur.Request(url)
         r.headers['Range'] = 'bytes=%s-%s' % (0, 65535)
-        f = urllib2.urlopen(r)
-        for x in range(65536/bytesize):
-            buffer = f.read(bytesize)
-            (l_value,)= struct.unpack(longlongformat, buffer)
-            hash += l_value
-            hash = hash & 0xFFFFFFFFFFFFFFFF #to remain as 64bit number  
+        f = ur.urlopen(r)
+        for x in range(int(65536/bytesize)):
+            buffer_ = f.read(bytesize)
+            (l_value,)= struct.unpack(longlongformat, buffer_)
+            hash_ += l_value
+            hash_ = hash_ & 0xFFFFFFFFFFFFFFFF #to remain as 64bit number  
     
-        # work on last 64KB of the file
-        r.headers['Range'] = 'bytes=%s-' % (long(filesize)-65536)
-        f = urllib2.urlopen(r)
-        for x in range(65536/bytesize):
-            buffer = f.read(bytesize)
-            (l_value,)= struct.unpack(longlongformat, buffer)
-            hash += l_value
-            hash = hash & 0xFFFFFFFFFFFFFFFF
+        ## work on last 64KB of the file
+        r.headers['Range'] = 'bytes=%s-' % (int(filesize)-65536)
+        f = ur.urlopen(r)
+        for x in range(int(65536/bytesize)):
+            buffer_ = f.read(bytesize)
+            (l_value,)= struct.unpack(longlongformat, buffer_)
+            hash_ += l_value
+            hash_ = hash_ & 0xFFFFFFFFFFFFFFFF
     
-        returnedhash = "%016x" % hash
+        returnedhash = "%016x" % hash_
         return filesize,returnedhash
 
-    except urllib2.HTTPError, e:
+    except ue.HTTPError as e:
         logger.error('HTTPError: %s.' % e.code)
         return None,None
     
-    except urllib2.URLError, e:
+    except ue.URLError as e:
         logger.error('URLError: %s.' % e.reason)
         return None,None
     
-    except:
+    except Exception as e:
         logger.error("hashURL failed with an unexpected error")
+        print(e)
         return None,None
 
 

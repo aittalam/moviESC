@@ -16,7 +16,7 @@ import init
 import scrapy
 from scrapy.linkextractors import LinkExtractor
 from scrapy.spiders import CrawlSpider, Rule
-from urlparse import urlparse
+from urllib.parse import urlparse
 import redis
 import re
 import url
@@ -25,7 +25,7 @@ import url
 def isVideoURL(url):
     ext = "(mkv|avi|mp4|m4v|ogv)"
     regex = re.compile(".*?"+ext+"$",re.I)
-    return re.match(regex,url)
+    return re.match(regex,url) is not None
 
 
 class OpendirCrawler(CrawlSpider):
@@ -52,7 +52,7 @@ class OpendirCrawler(CrawlSpider):
 
         # load configuration params and start logger
         cfgFileName = 'config.yaml'
-        if kwargs.has_key('config_file'):
+        if 'config_file' in kwargs:
             cfgFileName = kwargs.get('config_file')
 
         self._conf,self._logger = init.configure(config=cfgFileName)
@@ -66,19 +66,19 @@ class OpendirCrawler(CrawlSpider):
             self._logger.error("Could not open config file, reverting to defaults")
 
         # if different host/port/db are passed, override config file
-        if kwargs.has_key('redis_host'):
+        if 'redis_host' in kwargs:
             self.redis_host = kwargs.get('redis_host')
 
-        if kwargs.has_key('redis_port'):
+        if 'redis_port' in kwargs:
             self.redis_port = kwargs.get('redis_port')
 
-        if kwargs.has_key('redis_db'):
+        if 'redis_db' in kwargs:
             self.redis_db = kwargs.get('redis_db')
 
         # if a start url has been provided, set the current crawler to use it
         # (also, use its domain as allowed domain, and its path as allowed path
         # for the LinkExtractor so you never go above the provided directory)
-        if kwargs.has_key('start_url'):
+        if 'start_url' in kwargs:
             self.start_urls = [kwargs.get('start_url')]
             up = urlparse(kwargs.get('start_url'))
             self.allowed_domains = [up.netloc]
@@ -106,9 +106,10 @@ class OpendirCrawler(CrawlSpider):
     # is thrown away
     def filter_links(self, links):
         filteredLinks = []
+        print(links)
 
         for link in links:
-			# if link is a directory, then follow it
+			      # if link is a directory, then follow it
             # TODO: "?dir=" is provided to properly recognize as dirs the ones which
             #       are specified as queries (it is an in-place fix and should be removed)
             if link.url.endswith("/") or link.url.find("?dir=")>=0:
@@ -118,8 +119,9 @@ class OpendirCrawler(CrawlSpider):
             else:
                 if isVideoURL(link.url):
                     # normalize the URL
-                    # normLinkURL = link.url
-                    normLinkURL = url.parse(link.url).canonical().escape().punycode().utf8()
+                    normLinkURL = link.url
+                    #normLinkURL = url.parse(link.url).canonical().escape().punycode().utf8()
+                    
 
                     # save the url... but only if it has not been indexed yet
                     # check if the URL exists in redis

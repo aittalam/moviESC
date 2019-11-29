@@ -4,7 +4,7 @@ from trivialScraper import getAndExtract
 import imdb
 import urllib
 import re
-import md5
+import hashlib
 import os, os.path
 
 conf,logger = init.configure()
@@ -65,9 +65,10 @@ def getMovieMeta(IMDBid, downloadPosters = False):
         if downloadPosters:
             logger.debug('Storing posters in %s' % conf['path_posters'])
             for posterKey in ('full-size cover url','altPosterURL'):
-                if m.has_key(posterKey):
+                if posterKey in m:
+                    print(m[posterKey])
                     # build filename as a hash of the URL
-                    fname = os.path.join(conf['path_posters'],md5.new(m[posterKey]).hexdigest())
+                    fname = os.path.join(conf['path_posters'],hashlib.new('md5',m[posterKey].encode()).hexdigest())
                     # check if file exists...
                     if os.path.isfile(fname):
                         logger.debug('Poster at %s has already been downloaded: skipping' % m[posterKey])
@@ -77,7 +78,7 @@ def getMovieMeta(IMDBid, downloadPosters = False):
                         # TODO: catch urllib exceptions here (see below some for urllib2)
                         urllib.urlretrieve(m[posterKey],fname)
         return m
-    except imdb.IMDbDataAccessError, e:
+    except imdb.IMDbDataAccessError as e:
         logger.error('IMDB Data Access Error: %s' % e.errmsg)
         return
 #    except urllib2.HTTPError, e:
@@ -96,7 +97,7 @@ if __name__ == '__main__':
     else:
         IMDBid = sys.argv[1]
 
-    print "[i] Getting metadata for IMDB id %s..." % IMDBid
+    print ("[i] Getting metadata for IMDB id %s..." % IMDBid)
     m = getMovieMeta(IMDBid)
 
     if m:
@@ -105,12 +106,12 @@ if __name__ == '__main__':
             'runtime_simple', 'plot outline', 'cover url', 'full-size cover url', \
             'altPosterURL')
         for key in imdbKeys:
-            print "  %s: %s" % (key, m.get(key,""))
+            print ("  %s: %s" % (key, m.get(key,"")))
 
         # movie genres
-        print "  Genres:",
+        print ("  Genres:")
         for genre in m.get('genres',[]):
-            print "%s" %genre,
+            print ("%s" %genre)
 
     else:
-        print "[x] No metadata found"
+        print ("[x] No metadata found")

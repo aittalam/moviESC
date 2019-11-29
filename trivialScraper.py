@@ -1,5 +1,6 @@
 import init
-import urllib, urllib2
+import urllib.request as ur
+import urllib.error as ue
 import re
 
 # load configuration params and start logger
@@ -13,16 +14,16 @@ if conf is None:
 # returns a regular expression match otherwise
 def getAndExtract(url, regex):
     try:
-        response = urllib2.urlopen(url)
-        content = response.read()
+        response = ur.urlopen(url)
+        content = str(response.read())
         m = re.search(regex,content)
         return m
 
-    except urllib2.HTTPError, e:
+    except ue.HTTPError as e:
         logger.error('HTTPError: %s.' % e.code)
         return
 
-    except urllib2.URLError, e:
+    except ue.URLError as e:
         logger.error('URLError: %s.' % e.reason)
         return
 

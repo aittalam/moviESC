@@ -129,7 +129,7 @@ def getCachedMetadata(r, IMDBid):
 
 # connect to redis
 logger.info("Storing URLs in Redis (%s:%s, db %s)" %(redis_host,redis_port,redis_db))
-r = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
+r = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db, decode_responses=True)
 
 movnum = r.scard(key_toIndex)
 

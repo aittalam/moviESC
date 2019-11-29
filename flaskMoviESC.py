@@ -2,9 +2,9 @@ import init
 from flask import Flask, jsonify, abort, send_file
 import redis
 import urllib
-import StringIO
+import io
 import os
-import md5
+import hashlib
 
 showMoviesTemplate = './html/movies.html'
 
@@ -53,7 +53,6 @@ def showMovies():
 # get urls from IMDB ids
 @app.route('/api/v1.0/uris/<string:IMDBid>', methods = ['GET'])
 def get_uris(IMDBid):
-    print conf['key_uris']
     uris = list(r.smembers(conf['key_uris'].replace('#imdbid#',IMDBid)))
 
     # return the full data back
@@ -75,10 +74,10 @@ def get_poster(IMDBid):
     # TODO: remove this (low effort, but not very useful), and prefer something like poster-large, poster-medium, etc.
     #       within the imdb:* keys. Until then, the "posters" key might remain unofficial
     posterURL = r.srandmember('posters:'+IMDBid)
-    fname = os.path.join(conf['path_posters'],md5.new(posterURL).hexdigest())
+    fname = os.path.join(conf['path_posters'],hashlib.new('md5', posterURL.encode()).hexdigest())
     # TODO: check for filename existence first - if not, choose default "poster missing" pic
     f = open(fname,'rb')
-    image = send_file(StringIO.StringIO(f.read()), mimetype='image/jpg')
+    image = send_file(io.BytesIO(f.read()), mimetype='image/jpg')
     f.close()
     return image
 
@@ -134,10 +133,10 @@ def get_html_details(IMDBid):
         html = '<html><head><title>%s</title></head><body>' % details['long imdb title']
         html += '<a href="http://www.imdb.com/title/tt%s">back</a><br/>' % IMDBid
         html += '<h1>%s</h1>' % details['long imdb title']
-        if details.has_key('rating'):
+        if 'rating' in details:
             html += 'Rating: %s/10<br/><br/>' % details['rating']
         html += '<img src="/api/v1.0/poster/%s"><br/>' % IMDBid
-        if details.has_key('plot'):
+        if 'plot' in details:
             html += '<i>%s</i><br/>' % details['plot']
         html += '<br/>Download links:<br/><ul>'
         for url in urls:
@@ -172,7 +171,7 @@ def get_everything():
 if __name__ == "__main__":
 
     # connect to redis
-    r = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
+    r = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db, decode_responses=True)
 
     if devel :
         app.debug = True

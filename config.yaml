@@ -25,7 +25,7 @@ interactive_ident: !!bool 'False'
 # logger
 logging:
   version: 1
-  disable_existing_loggers: true
+  disable_existing_loggers: True
 
   root:
     level: !!python/name:logging.NOTSET
@@ -70,7 +70,6 @@ logging:
 
   formatters:
     simpleFormatter:
-      class: !!python/name:logging.Formatter
       #format: '%(name)s %(asctime)s %(levelname)s %(message)s'
       format: '[%(levelname)s] %(message)s'
       datefmt: '%Y%m%d%H%M%S'
