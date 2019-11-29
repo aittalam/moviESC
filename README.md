@@ -3,8 +3,8 @@ moviESC
 
 A simple, personal movie search engine, purposely built for the Powerbrowsing talk at ESC2K14 (http://www.endsummercamp.org/).
 
-Check out the talk slides at https://www.dropbox.com/s/w4f24yrq13n15im/pb_ESC.pdf and the video at
-https://www.youtube.com/watch?v=j0JdX8BiuvM (unfortunately, both are encrypted in Italian).
+Check out the video at 
+https://www.youtube.com/watch?v=j0JdX8BiuvM (unfortunately encrypted in Italian).
 
 moviESC is a set of tools allowing you to build your own movie search engine. This includes a
 crawler for movie opendirs, a movie identifier, an indexer, and few creative tools to make use of
@@ -27,9 +27,9 @@ Installation
 - Download and install redis (see http://redis.io/ for details):
 
 ```
-wget http://download.redis.io/releases/redis-3.0.2.tar.gz
-tar xvfz redis-3.0.2.tar.gz
-cd redis-3.0.2
+wget http://download.redis.io/releases/redis-5.0.7.tar.gz
+tar xvfz redis-5-0-7.tar.gz
+cd redis-5.0.7
 make
 ./src/redis-server
 ```
